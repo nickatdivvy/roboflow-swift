@@ -10,6 +10,6 @@ Pod::Spec.new do |spec|
   spec.license            = { :type => 'Apache', :text => 'See LICENSE at https://roboflow.com' }
   spec.author             = { "Roboflow" => "hello@roboflow.com" } 
   spec.swift_versions     = ['5.3']
-  spec.source             = { :git => 'https://github.com/nickatdivvy/roundrecap-specs.git', :tag => "#{spec.version}" }
+  spec.source             = { :git => 'https://github.com/nickatdivvy/roboflow-swift.git', :tag => "#{spec.version}" }
   spec.source_files       = 'Sources/**/*'
 end
