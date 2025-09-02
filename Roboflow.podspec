@@ -1,5 +1,5 @@
 Pod::Spec.new do |spec|
-  spec.name               = "Roboflow"
+  spec.name               = "Roboflow-roundrecap"
   spec.version            = "1.2.5"
   spec.platform           = :ios, '15.2'
   spec.ios.deployment_target = '15.2'
@@ -10,6 +10,6 @@ Pod::Spec.new do |spec|
   spec.license            = { :type => 'Apache', :text => 'See LICENSE at https://roboflow.com' }
   spec.author             = { "Roboflow" => "hello@roboflow.com" } 
   spec.swift_versions     = ['5.3']
-  spec.source             = { :git => 'https://github.com/roboflow/roboflow-swift.git', :tag => "#{spec.version}" }
+  spec.source             = { :git => 'https://github.com/nickatdivvy/roundrecap-specs.git', :tag => "#{spec.version}" }
   spec.source_files       = 'Sources/**/*'
 end
