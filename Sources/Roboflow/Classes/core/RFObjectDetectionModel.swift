@@ -19,8 +19,9 @@ public class RFObjectDetectionModel: RFModel {
     var thresholdProvider = ThresholdProvider()
     
     //Configure the parameters for the model
-    public override func configure(threshold: Double = 0.5, overlap: Double = 0.5, maxObjects: Float = 20, processingMode: ProcessingMode = .balanced, maxNumberPoints: Int = 500) {
-        super.configure(threshold: threshold, overlap: overlap, maxObjects: maxObjects, processingMode: processingMode, maxNumberPoints: maxNumberPoints)
+    public override func configure(threshold: Double = 0.5, overlap: Double = 0.5, maxObjects: Float = 20, processingMode: ProcessingMode = .balanced, maxNumberPoints: Int = 500, sourceOrientation: CGImagePropertyOrientation? = nil, targetOrientation: CGImagePropertyOrientation? = nil, imageCropAndScaleOption: VNImageCropAndScaleOption = .scaleFill) {
+        super.configure(threshold: threshold, overlap: overlap, maxObjects: maxObjects, processingMode: processingMode, maxNumberPoints: maxNumberPoints, sourceOrientation: sourceOrientation, targetOrientation: targetOrientation, imageCropAndScaleOption: imageCropAndScaleOption)
+        
         thresholdProvider.values = ["iouThreshold": MLFeatureValue(double: self.overlap),
                                     "confidenceThreshold": MLFeatureValue(double: self.threshold)]
         if visionModel != nil {
@@ -72,8 +73,9 @@ public class RFObjectDetectionModel: RFModel {
             completion(nil, "Model initialization failed.")
             return
         }
-        let handler = VNImageRequestHandler(cvPixelBuffer: buffer)
-
+        
+        let handler = self.sourceOrientation != nil ? VNImageRequestHandler(cvPixelBuffer: buffer, orientation: self.sourceOrientation!) :  VNImageRequestHandler(cvPixelBuffer: buffer)
+        
         do {
             try handler.perform([coreMLRequest])
             
@@ -81,20 +83,14 @@ public class RFObjectDetectionModel: RFModel {
             
             var detections:[RFObjectDetectionPrediction] = []
             for detectResult in detectResults {
-                let flippedBox = CGRect(x: detectResult.boundingBox.minX, y: 1 - detectResult.boundingBox.maxY, width: detectResult.boundingBox.width, height: detectResult.boundingBox.height)
+                let flippedBox = self.sourceOrientation == .right && self.targetOrientation == .up ? CGRect(x: 1-detectResult.boundingBox.maxY, y: 1 - detectResult.boundingBox.maxX, width: detectResult.boundingBox.height, height: detectResult.boundingBox.width): CGRect(x: detectResult.boundingBox.minX, y: 1 - detectResult.boundingBox.maxY, width: detectResult.boundingBox.width, height: detectResult.boundingBox.height)
                 
                 let box = VNImageRectForNormalizedRect(flippedBox, Int(buffer.width()), Int(buffer.height()))
                 let confidence = detectResult.confidence
                 var label:String = ""
                 if #available(macOS 10.14, *) {
                     if let recognizedResult = detectResult as? VNRecognizedObjectObservation, let classLabel = recognizedResult.labels.first?.identifier {
-                        // class labels may be stripped from the model when weights trained externally and uploaded.
-                        // if our class it is an integer and it is not a defined class, look it up in our class map.
-                        if let intValue = Int(classLabel), !classes.contains(classLabel), intValue < classes.count {
-                            label = classes[intValue]
-                        } else {
-                            label = classLabel
-                        }
+                        label = classLabel
                     }
                 } else {
                     // Fallback on earlier versions

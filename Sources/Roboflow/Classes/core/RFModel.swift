@@ -35,14 +35,20 @@ public class RFModel: NSObject {
     var maxObjects: Float = 20
     var maskProcessingMode: ProcessingMode = .balanced
     var maskMaxNumberPoints: Int = 500
+    var sourceOrientation: CGImagePropertyOrientation?
+    var targetOrientation: CGImagePropertyOrientation?
+    var imageCropAndScaleOption: VNImageCropAndScaleOption!
 
     //Configure the parameters for the model
-    public func configure(threshold: Double = 0.5, overlap: Double = 0.5, maxObjects: Float = 20, processingMode: ProcessingMode = .balanced, maxNumberPoints: Int = 500) {
+    public func configure(threshold: Double = 0.5, overlap: Double = 0.5, maxObjects: Float = 20, processingMode: ProcessingMode = .balanced, maxNumberPoints: Int = 500, sourceOrientation: CGImagePropertyOrientation? = nil, targetOrientation: CGImagePropertyOrientation? = nil, imageCropAndScaleOption: VNImageCropAndScaleOption = .scaleFill) {
         self.threshold = threshold
         self.overlap = overlap
         self.maxObjects = maxObjects
         self.maskProcessingMode = processingMode
         self.maskMaxNumberPoints = maxNumberPoints
+        self.sourceOrientation = sourceOrientation
+        self.imageCropAndScaleOption = imageCropAndScaleOption
+        self.targetOrientation = targetOrientation
     }
     
     //Load the retrieved CoreML model into an already created RFObjectDetectionModel instance

@@ -27,7 +27,8 @@ public class RFDetrObjectDetectionModel: RFObjectDetectionModel {
             if #available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *) {
                 let config = MLModelConfiguration()
                 if #available(iOS 16.0, *) {
-                    config.computeUnits = .cpuAndNeuralEngine
+                    config.computeUnits = .all
+//                    config.allowLowPrecisionAccumulationOnGPU = true
                 } else {
                     // Fallback on earlier versions
                 }
@@ -44,7 +45,7 @@ public class RFDetrObjectDetectionModel: RFObjectDetectionModel {
                 do {
                     visionModel = try VNCoreMLModel(for: mlModel)
                     let request = VNCoreMLRequest(model: visionModel)
-                    request.imageCropAndScaleOption = .scaleFill
+//                    request.imageCropAndScaleOption = .centerCrop
                     coreMLRequest = request
                 } catch {
                     print("Error to initialize RFDetr model: \(error)")
@@ -56,6 +57,13 @@ public class RFDetrObjectDetectionModel: RFObjectDetectionModel {
             return error
         }
         return nil
+    }
+    
+    
+    public override func configure(threshold: Double = 0.5, overlap: Double = 0.5, maxObjects: Float = 20, processingMode: ProcessingMode = .balanced, maxNumberPoints: Int = 500, sourceOrientation: CGImagePropertyOrientation? = nil, targetOrientation: CGImagePropertyOrientation? = nil, imageCropAndScaleOption: VNImageCropAndScaleOption = .scaleFill) {
+        super.configure(threshold: threshold, overlap: overlap, maxObjects: maxObjects, processingMode: processingMode, maxNumberPoints: maxNumberPoints, sourceOrientation: sourceOrientation, targetOrientation: targetOrientation, imageCropAndScaleOption: imageCropAndScaleOption)
+        
+        self.coreMLRequest.imageCropAndScaleOption = .scaleFill//imageCropAndScaleOption
     }
 
     /// Run image through RFDetr model and return object detection predictions
@@ -73,15 +81,23 @@ public class RFDetrObjectDetectionModel: RFObjectDetectionModel {
     /// VNCoreML-based detection for macOS 10.15+ / iOS 13.0+
     @available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
     private func detectWithVNCoreML(pixelBuffer buffer: CVPixelBuffer, completion: @escaping (([RFPrediction]?, Error?) -> Void)) {
+        let width = CVPixelBufferGetWidth(buffer)
+        let height = CVPixelBufferGetHeight(buffer)
+        print("Buffer size: \(width)x\(height)")
         guard let coreMLRequest = self.coreMLRequest else {
             completion(nil, NSError(domain: "RFDetrObjectDetectionModel", code: 1, userInfo: [NSLocalizedDescriptionKey: "VNCoreML model initialization failed."]))
             return
         }
         
-        let handler = VNImageRequestHandler(cvPixelBuffer: buffer)
+        let handler = self.sourceOrientation != nil ? VNImageRequestHandler(cvPixelBuffer: buffer, orientation: self.sourceOrientation!) :  VNImageRequestHandler(cvPixelBuffer: buffer);
         
         do {
+            
+            let startTime = Date()
             try handler.perform([coreMLRequest])
+            
+            let processingTime = Date().timeIntervalSince(startTime) * 1000 // Convert to milliseconds
+            print("[RFDetrObjectDetectionModel] ⏱️ Internal Model inference completed in \(String(format: "%.1f", processingTime))ms")
             
             // For RFDetr models, we need to access the raw MLFeatureProvider results
             // since they don't return standard VNDetectedObjectObservation objects
@@ -158,10 +174,20 @@ public class RFDetrObjectDetectionModel: RFObjectDetectionModel {
             let height_norm = Float(boxes[[0, i, 3] as [NSNumber]].doubleValue)
             
             // Convert normalized coordinates to pixel coordinates
-            let centerX = centerX_norm * Float(imageWidth)
-            let centerY = centerY_norm * Float(imageHeight)
-            let width = abs(width_norm) * Float(imageWidth)  // Use abs() to handle negative values
-            let height = abs(height_norm) * Float(imageHeight)
+            var centerX = (centerX_norm) * Float(imageWidth)
+            var centerY = (centerY_norm) * Float(imageHeight)
+            var width = abs(width_norm) * Float(imageWidth)  // Use abs() to handle negative values
+            var height = abs(height_norm) * Float(imageHeight)
+
+            if (self.sourceOrientation == .right && self.targetOrientation == .up && false) {
+                // Convert normalized coordinates to pixel coordinates
+                centerY = (1-centerX_norm) * Float(imageWidth)
+                centerX = (centerY_norm) * Float(imageHeight)
+                height = abs(width_norm) * Float(imageWidth)  // Use abs() to handle negative values
+                width = abs(height_norm) * Float(imageHeight)
+            }
+            
+            print("Detection: \(centerX) \(centerY) \(width) \(height)")
             
             // Skip invalid boxes
             if width <= 0 || height <= 0 {
@@ -174,6 +200,7 @@ public class RFDetrObjectDetectionModel: RFObjectDetectionModel {
             
             // Create bounding box rect
             let box = CGRect(x: CGFloat(x1), y: CGFloat(y1), width: CGFloat(width), height: CGFloat(height))
+//            let flippedBox = CGRect(x: 1-detectResult.boundingBox.maxY, y: 1 - detectResult.boundingBox.maxX, width: detectResult.boundingBox.height, height: detectResult.boundingBox.width)
             
             // Get color for this class
             let color = hexStringToCGColor(hex: colors[className] ?? "#ff0000")
